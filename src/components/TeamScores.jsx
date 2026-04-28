@@ -4,6 +4,7 @@ import { supabase } from '../utils/supabase'
 import { calcTeamScore } from '../utils/stats'
 import { ROUND_TYPES } from '../constants'
 import { RoundTypeBadge } from './ui/RoundTypeBadge'
+import { Tooltip } from './ui/Tooltip'
 import { EditRoundModal } from './EditRoundModal'
 import { useAuth } from '../hooks/useAuth'
 
@@ -318,31 +319,74 @@ export function TeamScores() {
               <thead>
                 <tr>
                   <th className="min-w-[55px] cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-2 py-2.5 text-center text-[11px] font-bold whitespace-nowrap text-white">
-                    Season
+                    <div className="flex justify-center">
+                      <Tooltip
+                        label="Season"
+                        tip="The season this round belongs to"
+                      />
+                    </div>
                   </th>
                   <th className="min-w-[100px] cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-2 py-2.5 text-center text-[11px] font-bold whitespace-nowrap text-white">
-                    Type
+                    <div className="flex justify-center">
+                      <Tooltip
+                        label="Type"
+                        tip="Practice, Conference, or Non-Conference match"
+                      />
+                    </div>
                   </th>
                   <th className="min-w-[48px] cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-2 py-2.5 text-center text-[11px] font-bold whitespace-nowrap text-white">
-                    Date
+                    <div className="flex justify-center">
+                      <Tooltip
+                        label="Date"
+                        tip="Date the round was played"
+                      />
+                    </div>
                   </th>
                   <th className="min-w-[180px] cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-2 py-2.5 pl-2.5 text-left text-[11px] font-bold whitespace-nowrap text-white">
-                    Course
+                    <Tooltip
+                      label="Course"
+                      tip="Course where the round was played"
+                    />
                   </th>
                   <th className="min-w-[55px] cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-2 py-2.5 text-center text-[11px] font-bold whitespace-nowrap text-white">
-                    Team Score
+                    <div className="flex justify-center">
+                      <Tooltip
+                        label="Team Score"
+                        tip="Sum of the 4 lowest individual scores from this round. Lower is better"
+                      />
+                    </div>
                   </th>
                   <th className="min-w-[55px] cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-2 py-2.5 text-center text-[11px] font-bold whitespace-nowrap text-white">
-                    Finish
+                    <div className="flex justify-center">
+                      <Tooltip
+                        label="Finish"
+                        tip="Where the team placed in this match — Conference and Non-Conference only"
+                      />
+                    </div>
                   </th>
                   <th className="min-w-[65px] cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-2 py-2.5 text-center text-[11px] font-bold whitespace-nowrap text-white">
-                    1st Score
+                    <div className="flex justify-center">
+                      <Tooltip
+                        label="1st Score"
+                        tip="The winning team's total score for this match — Conference and Non-Conference only"
+                      />
+                    </div>
                   </th>
                   <th className="min-w-[50px] cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-2 py-2.5 text-center text-[11px] font-bold whitespace-nowrap text-white">
-                    Rating
+                    <div className="flex justify-center">
+                      <Tooltip
+                        label="Rating"
+                        tip="18-hole course rating — the score a scratch golfer is expected to shoot"
+                      />
+                    </div>
                   </th>
                   <th className="min-w-[46px] cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-2 py-2.5 text-center text-[11px] font-bold whitespace-nowrap text-white">
-                    Slope
+                    <div className="flex justify-center">
+                      <Tooltip
+                        label="Slope"
+                        tip="Measures course difficulty relative to a bogey golfer. Standard is 113"
+                      />
+                    </div>
                   </th>
                   {allNames.map((n) => (
                     <th

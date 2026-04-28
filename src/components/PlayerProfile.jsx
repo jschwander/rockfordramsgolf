@@ -10,6 +10,7 @@ import { calcDiff, calcPlayerStats, calcScramble } from '../utils/stats'
 import { playerDisplayName } from '../utils/players'
 import { ROUND_TYPES } from '../constants'
 import { RoundTypeBadge } from './ui/RoundTypeBadge'
+import { Tooltip } from './ui/Tooltip'
 import { ProfileCharts } from './charts/ProfileCharts'
 
 /** @typedef {{
@@ -265,13 +266,46 @@ export function PlayerProfile() {
   }
 
   const statCards = [
-    { lbl: 'Avg Score', val: stats.avgScore },
-    { lbl: 'Avg Diff', val: stats.avgDiff },
-    { lbl: 'Avg GIR', val: stats.avgGir },
-    { lbl: 'Avg FIR', val: stats.avgFir },
-    { lbl: 'Avg Putts', val: stats.avgPutts },
-    { lbl: 'Avg Pen', val: stats.avgPen },
-    { lbl: 'Scramble %', val: stats.avgScr },
+    {
+      lbl: 'Avg Score',
+      val: stats.avgScore,
+      tip: 'Average 9-hole raw score across all rounds in the selected filter',
+    },
+    {
+      lbl: 'Avg Diff',
+      val: stats.avgDiff,
+      tip:
+        'Average score differential — how many strokes above or below a scratch golfer you typically shoot, adjusted for course difficulty',
+    },
+    {
+      lbl: 'Avg GIR',
+      val: stats.avgGir,
+      tip:
+        'Average Greens in Regulation per round out of 9. A green is hit in regulation when you reach it in par minus 2 strokes',
+    },
+    {
+      lbl: 'Avg FIR',
+      val: stats.avgFir,
+      tip:
+        'Average Fairways in Regulation per round out of 9. Measures how often your tee shot lands in the fairway',
+    },
+    {
+      lbl: 'Avg Putts',
+      val: stats.avgPutts,
+      tip: 'Average total putts per round. Lower is better',
+    },
+    {
+      lbl: 'Avg Pen',
+      val: stats.avgPen,
+      tip:
+        'Average penalty strokes per round including out of bounds, water hazards, lost balls',
+    },
+    {
+      lbl: 'Scramble %',
+      val: stats.avgScr,
+      tip:
+        'Percentage of times you made par or better after missing a green. Shows short game and recovery ability',
+    },
   ]
 
   if (!playerName) {
@@ -349,8 +383,8 @@ export function PlayerProfile() {
               className="rounded-lg border border-[#2a2a2a] bg-[#1A1A1A] px-1.5 py-2.5 text-center"
             >
               <div className="text-lg font-bold text-[#E8650A]">{s.val}</div>
-              <div className="mt-1 text-[9px] font-bold uppercase tracking-wide text-[#666666]">
-                {s.lbl}
+              <div className="mt-1 flex justify-center text-[9px] font-bold uppercase tracking-wide text-[#666666]">
+                <Tooltip label={s.lbl} tip={s.tip} />
               </div>
             </div>
           ))}
@@ -401,41 +435,101 @@ export function PlayerProfile() {
                 <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] py-2.5 text-center text-[11px] font-bold text-white">
                   Diff
                 </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] py-2.5 text-center text-[11px] font-bold text-white">
-                  GIR
+                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
+                  <div className="flex justify-center">
+                    <Tooltip
+                      label="GIR"
+                      tip="Greens in Regulation out of 9"
+                    />
+                  </div>
                 </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] py-2.5 text-center text-[11px] font-bold text-white">
-                  FIR
+                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
+                  <div className="flex justify-center">
+                    <Tooltip
+                      label="FIR"
+                      tip="Fairways in Regulation out of 9"
+                    />
+                  </div>
                 </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] py-2.5 text-center text-[11px] font-bold text-white">
-                  Putts
+                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
+                  <div className="flex justify-center">
+                    <Tooltip
+                      label="Putts"
+                      tip="Total putts taken during the round"
+                    />
+                  </div>
                 </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] py-2.5 text-center text-[11px] font-bold text-white">
-                  Pen
+                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
+                  <div className="flex justify-center">
+                    <Tooltip
+                      label="Pen"
+                      tip="Penalty strokes — out of bounds, hazards, lost balls"
+                    />
+                  </div>
                 </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] py-2.5 text-center text-[11px] font-bold text-white">
-                  U&amp;D
+                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
+                  <div className="flex justify-center">
+                    <Tooltip
+                      label="U&D"
+                      tip="Up and Downs — times you got up and down after missing a green"
+                    />
+                  </div>
                 </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] py-2.5 text-center text-[11px] font-bold text-white">
-                  Scr%
+                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
+                  <div className="flex justify-center">
+                    <Tooltip
+                      label="Scr%"
+                      tip="Scramble % — Up & Downs divided by greens missed. Higher is better"
+                    />
+                  </div>
                 </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] py-2.5 text-center text-[11px] font-bold text-white">
-                  Eagles
+                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
+                  <div className="flex justify-center">
+                    <Tooltip
+                      label="Eagles"
+                      tip="Holes completed 2 under par"
+                    />
+                  </div>
                 </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] py-2.5 text-center text-[11px] font-bold text-white">
-                  Birdies
+                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
+                  <div className="flex justify-center">
+                    <Tooltip
+                      label="Birdies"
+                      tip="Holes completed 1 under par"
+                    />
+                  </div>
                 </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] py-2.5 text-center text-[11px] font-bold text-white">
-                  Pars
+                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
+                  <div className="flex justify-center">
+                    <Tooltip
+                      label="Pars"
+                      tip="Holes completed at par"
+                    />
+                  </div>
                 </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] py-2.5 text-center text-[11px] font-bold text-white">
-                  Bogeys
+                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
+                  <div className="flex justify-center">
+                    <Tooltip
+                      label="Bogeys"
+                      tip="Holes completed 1 over par"
+                    />
+                  </div>
                 </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] py-2.5 text-center text-[11px] font-bold text-white">
-                  Doubles
+                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
+                  <div className="flex justify-center">
+                    <Tooltip
+                      label="Doubles"
+                      tip="Holes completed 2 over par"
+                    />
+                  </div>
                 </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] py-2.5 text-center text-[11px] font-bold text-white">
-                  Other
+                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
+                  <div className="flex justify-center">
+                    <Tooltip
+                      label="Other"
+                      tip="Holes completed 3 or more over par"
+                    />
+                  </div>
                 </th>
               </tr>
             </thead>
