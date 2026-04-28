@@ -120,23 +120,44 @@ export function ManageRoster() {
   async function saveEdit(e) {
     e.preventDefault()
     if (!editPlayer || !editFirst.trim()) return
+    const oldName = playerDisplayName(editPlayer)
+    const fn = editFirst.trim()
+    const ln = editLast.trim()
+    const newName =
+      [fn, ln].filter(Boolean).join(' ').trim() || fn
+
     setSavingEdit(true)
-    const { error } = await supabase
-      .from('players')
-      .update({
-        first_name: editFirst.trim(),
-        last_name: editLast.trim(),
-        grade: editGrade.trim(),
-      })
-      .eq('id', editPlayer.id)
-    setSavingEdit(false)
-    if (error) {
-      alert(error.message)
-      return
+    try {
+      const { error: playerErr } = await supabase
+        .from('players')
+        .update({
+          first_name: fn,
+          last_name: ln,
+          grade: editGrade.trim(),
+        })
+        .eq('id', editPlayer.id)
+      if (playerErr) {
+        alert(playerErr.message)
+        return
+      }
+
+      if (oldName !== newName) {
+        const { error: scoresErr } = await supabase
+          .from('round_scores')
+          .update({ player_name: newName })
+          .eq('player_name', oldName)
+        if (scoresErr) {
+          alert(scoresErr.message)
+          return
+        }
+      }
+
+      await load()
+      window.dispatchEvent(new CustomEvent('rams:rounds-updated'))
+      closeEdit()
+    } finally {
+      setSavingEdit(false)
     }
-    await load()
-    window.dispatchEvent(new CustomEvent('rams:rounds-updated'))
-    closeEdit()
   }
 
   return (
