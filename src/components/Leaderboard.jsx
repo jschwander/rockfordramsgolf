@@ -107,6 +107,12 @@ export function Leaderboard() {
     loadData()
   }, [loadData])
 
+  useEffect(() => {
+    const fn = () => loadData()
+    window.addEventListener('rams:rounds-updated', fn)
+    return () => window.removeEventListener('rams:rounds-updated', fn)
+  }, [loadData])
+
   const filteredRounds = useMemo(() => {
     return rounds.filter(
       (r) =>

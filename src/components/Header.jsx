@@ -1,8 +1,30 @@
-import { Link } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
 
-export function Header({ seasonSubtitle }) {
-  const { isAdmin } = useAuth()
+export function Header({ seasonSubtitle, onOpenAddRound }) {
+  const { isAdmin, signOut } = useAuth()
+  const [manageOpen, setManageOpen] = useState(false)
+  const manageRef = useRef(null)
+
+  useEffect(() => {
+    if (!manageOpen) return
+    const onDoc = (e) => {
+      if (manageRef.current && !manageRef.current.contains(e.target)) {
+        setManageOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [manageOpen])
+
+  const linkClass = ({ isActive }) =>
+    [
+      'block w-full border-none px-4 py-2.5 text-left text-sm font-bold transition-colors',
+      isActive
+        ? 'bg-[#2a2a2a] text-[#E8650A]'
+        : 'bg-transparent text-white hover:bg-[#2a2a2a]',
+    ].join(' ')
 
   return (
     <header className="mb-4 flex flex-col gap-3 rounded-[10px] border border-[#2a2a2a] bg-[#1A1A1A] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -25,17 +47,71 @@ export function Header({ seasonSubtitle }) {
       <div className="flex flex-wrap items-center gap-2 sm:justify-end">
         {isAdmin ? (
           <>
+            <div className="relative" ref={manageRef}>
+              <button
+                type="button"
+                aria-expanded={manageOpen}
+                aria-haspopup="menu"
+                className="min-h-[44px] rounded-md border border-[#444444] bg-[#2a2a2a] px-4 text-sm font-bold text-white hover:bg-[#333333]"
+                onClick={() => setManageOpen((o) => !o)}
+              >
+                ⚙ Manage Team
+              </button>
+              {manageOpen ? (
+                <div
+                  className="absolute right-0 top-[calc(100%+8px)] z-[200] min-w-[240px] overflow-hidden rounded-lg border border-[#444444] bg-[#1A1A1A] py-1 shadow-xl"
+                  role="menu"
+                >
+                  <NavLink
+                    to="/manage/roster"
+                    role="menuitem"
+                    className={linkClass}
+                    onClick={() => setManageOpen(false)}
+                  >
+                    👥 Roster
+                  </NavLink>
+                  <NavLink
+                    to="/manage/courses"
+                    role="menuitem"
+                    className={linkClass}
+                    onClick={() => setManageOpen(false)}
+                  >
+                    ⛳ Courses
+                  </NavLink>
+                  <NavLink
+                    to="/manage/seasons"
+                    role="menuitem"
+                    className={linkClass}
+                    onClick={() => setManageOpen(false)}
+                  >
+                    📅 Seasons
+                  </NavLink>
+                  <NavLink
+                    to="/manage/export"
+                    role="menuitem"
+                    className={linkClass}
+                    onClick={() => setManageOpen(false)}
+                  >
+                    💾 Export / Import
+                  </NavLink>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="block w-full border-t border-[#333333] px-4 py-2.5 text-left text-sm font-bold text-[#aaaaaa] hover:bg-[#2a2a2a] hover:text-white"
+                    onClick={() => {
+                      setManageOpen(false)
+                      void signOut()
+                    }}
+                  >
+                    Log out
+                  </button>
+                </div>
+              ) : null}
+            </div>
             <button
               type="button"
-              className="min-h-[44px] rounded-md border border-[#444444] bg-[#2a2a2a] px-4 text-sm font-bold text-white opacity-50"
-              disabled
-            >
-              ⚙ Manage Team
-            </button>
-            <button
-              type="button"
-              className="min-h-[44px] rounded-md bg-[#E8650A] px-5 text-sm font-bold text-white opacity-50"
-              disabled
+              className="min-h-[44px] rounded-md bg-[#E8650A] px-5 text-sm font-bold text-white hover:bg-[#B84E07]"
+              onClick={() => onOpenAddRound?.()}
             >
               ＋ Add Round
             </button>

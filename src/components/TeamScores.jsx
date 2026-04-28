@@ -166,6 +166,12 @@ export function TeamScores() {
   }, [loadData])
 
   useEffect(() => {
+    const fn = () => loadData()
+    window.addEventListener('rams:rounds-updated', fn)
+    return () => window.removeEventListener('rams:rounds-updated', fn)
+  }, [loadData])
+
+  useEffect(() => {
     if (!seasons.length) return
     setTsSeasonFilter((prev) => {
       if (seasons.includes(prev)) return prev

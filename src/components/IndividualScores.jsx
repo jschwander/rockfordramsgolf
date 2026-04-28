@@ -103,6 +103,12 @@ export function IndividualScores() {
   }, [loadData])
 
   useEffect(() => {
+    const fn = () => loadData()
+    window.addEventListener('rams:rounds-updated', fn)
+    return () => window.removeEventListener('rams:rounds-updated', fn)
+  }, [loadData])
+
+  useEffect(() => {
     if (!seasons.length) return
     setSeasonFilter((prev) => {
       if (seasons.includes(prev)) return prev
