@@ -47,6 +47,7 @@ export function Header({ seasonSubtitle, onOpenAddRound }) {
       <div className="flex flex-wrap items-center gap-2 sm:justify-end">
         {isAdmin ? (
           <>
+            {/* Spec §6: these must stay enabled and fully opaque — no disabled, no opacity-50 */}
             <div className="relative" ref={manageRef}>
               <button
                 type="button"
