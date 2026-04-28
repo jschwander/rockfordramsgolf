@@ -13,6 +13,12 @@ export function ManageRoster() {
   const [grade, setGrade] = useState('')
   const [saving, setSaving] = useState(false)
 
+  const [editPlayer, setEditPlayer] = useState(null)
+  const [editFirst, setEditFirst] = useState('')
+  const [editLast, setEditLast] = useState('')
+  const [editGrade, setEditGrade] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
+
   const load = useCallback(async () => {
     setLoadErr(null)
     const [sRes, pRes] = await Promise.all([
@@ -98,6 +104,39 @@ export function ManageRoster() {
     }
     await load()
     window.dispatchEvent(new CustomEvent('rams:rounds-updated'))
+  }
+
+  function openEdit(p) {
+    setEditPlayer(p)
+    setEditFirst(p.first_name ?? '')
+    setEditLast(p.last_name ?? '')
+    setEditGrade(p.grade ?? '')
+  }
+
+  function closeEdit() {
+    setEditPlayer(null)
+  }
+
+  async function saveEdit(e) {
+    e.preventDefault()
+    if (!editPlayer || !editFirst.trim()) return
+    setSavingEdit(true)
+    const { error } = await supabase
+      .from('players')
+      .update({
+        first_name: editFirst.trim(),
+        last_name: editLast.trim(),
+        grade: editGrade.trim(),
+      })
+      .eq('id', editPlayer.id)
+    setSavingEdit(false)
+    if (error) {
+      alert(error.message)
+      return
+    }
+    await load()
+    window.dispatchEvent(new CustomEvent('rams:rounds-updated'))
+    closeEdit()
   }
 
   return (
@@ -212,20 +251,33 @@ export function ManageRoster() {
                 <td className="border-b border-[#252525] py-2 text-center text-[#dddddd]">
                   {p.active ? 'Yes' : 'No'}
                 </td>
-                <td className="border-b border-[#252525] py-2 text-right">
+                <td className="border-b border-[#252525] py-2 text-right whitespace-nowrap">
                   <button
                     type="button"
-                    className="mr-2 rounded border border-[#333333] px-2 py-1 text-[10px] font-bold text-[#aaaaaa] hover:bg-[#2a2a2a]"
-                    onClick={() => toggleActive(p)}
+                    title="Edit"
+                    aria-label="Edit player"
+                    className="mr-2 rounded border border-[#333333] px-2 py-1 text-[11px] font-bold text-[#aaaaaa] hover:bg-[#2a2a2a]"
+                    onClick={() => openEdit(p)}
                   >
-                    {p.active ? 'Deactivate' : 'Activate'}
+                    ✏
                   </button>
                   <button
                     type="button"
-                    className="rounded border border-[#ef5350] px-2 py-1 text-[10px] font-bold text-[#ef5350] hover:bg-[#2a1515]"
+                    title={p.active ? 'Deactivate' : 'Activate'}
+                    aria-label={p.active ? 'Deactivate' : 'Activate'}
+                    className="mr-2 rounded border border-[#333333] px-2 py-1 text-[11px] font-bold text-[#aaaaaa] hover:bg-[#2a2a2a]"
+                    onClick={() => toggleActive(p)}
+                  >
+                    —
+                  </button>
+                  <button
+                    type="button"
+                    title="Remove"
+                    aria-label="Remove player"
+                    className="rounded border border-[#ef5350] px-2 py-1 text-[11px] font-bold text-[#ef5350] hover:bg-[#2a1515]"
                     onClick={() => removePlayer(p)}
                   >
-                    Remove
+                    ✕
                   </button>
                 </td>
               </tr>
@@ -233,6 +285,83 @@ export function ManageRoster() {
           </tbody>
         </table>
       </div>
+
+      {editPlayer ? (
+        <div
+          className="fixed inset-0 z-[250] flex items-start justify-center overflow-y-auto bg-black/75 px-4 py-8"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-player-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !savingEdit) closeEdit()
+          }}
+        >
+          <form
+            className="my-auto w-full max-w-[400px] rounded-xl border border-[#333333] bg-[#1A1A1A] p-6"
+            onSubmit={saveEdit}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3
+              id="edit-player-title"
+              className="mb-4 border-b-2 border-[#E8650A] pb-2.5 text-[15px] font-bold text-white"
+            >
+              Edit player
+            </h3>
+            <div className="mb-4 flex flex-col gap-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-[#888888]">
+                  First name
+                </span>
+                <input
+                  value={editFirst}
+                  onChange={(e) => setEditFirst(e.target.value)}
+                  className="rounded-md border border-[#333333] bg-[#111111] px-3 py-2 text-sm text-white focus:border-[#E8650A] focus:outline-none"
+                  required
+                  autoFocus
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-[#888888]">
+                  Last name
+                </span>
+                <input
+                  value={editLast}
+                  onChange={(e) => setEditLast(e.target.value)}
+                  className="rounded-md border border-[#333333] bg-[#111111] px-3 py-2 text-sm text-white focus:border-[#E8650A] focus:outline-none"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-[#888888]">
+                  Grade
+                </span>
+                <input
+                  value={editGrade}
+                  onChange={(e) => setEditGrade(e.target.value)}
+                  className="rounded-md border border-[#333333] bg-[#111111] px-3 py-2 text-sm text-white focus:border-[#E8650A] focus:outline-none"
+                  placeholder="Junior"
+                />
+              </label>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-md border border-[#333333] bg-transparent px-4 py-2 text-sm font-bold text-[#aaaaaa] hover:bg-[#2a2a2a]"
+                disabled={savingEdit}
+                onClick={closeEdit}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={savingEdit}
+                className="min-h-[44px] rounded-md bg-[#E8650A] px-5 text-sm font-bold text-white hover:bg-[#B84E07] disabled:opacity-50"
+              >
+                {savingEdit ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </div>
   )
 }
