@@ -12,6 +12,7 @@ import { ROUND_TYPES } from '../constants'
 import { RoundTypeBadge } from './ui/RoundTypeBadge'
 import { Tooltip } from './ui/Tooltip'
 import { ProfileCharts } from './charts/ProfileCharts'
+import { formatDateMD } from '../utils/dates'
 
 /** @typedef {{
  *   date: string,
@@ -153,6 +154,7 @@ export function PlayerProfile() {
           rowId: row.id,
           roundId: r.id,
           date: r.date,
+          dateLabel: formatDateMD(r.date),
           course: r.course_name,
           type: r.type ?? 'Practice',
           score: row.score,
@@ -164,20 +166,9 @@ export function PlayerProfile() {
         }
       })
       .sort((a, b) => {
-        const parse = (d) => {
-          const parts = String(d).split('/')
-          if (parts.length >= 2) {
-            const m = Number.parseInt(parts[0], 10)
-            const day = Number.parseInt(parts[1], 10)
-            const y = parts[2]
-              ? Number.parseInt(parts[2], 10)
-              : new Date().getFullYear()
-            if (!Number.isNaN(m) && !Number.isNaN(day))
-              return new Date(y, m - 1, day).getTime()
-          }
-          return 0
-        }
-        return parse(a.date) - parse(b.date)
+        const at = Date.parse(`${a.date}T00:00:00Z`) || 0
+        const bt = Date.parse(`${b.date}T00:00:00Z`) || 0
+        return at - bt
       })
 
     setAllRows(mapped)
@@ -566,7 +557,7 @@ export function PlayerProfile() {
                       className="even:bg-[#1f1f1f] hover:bg-[#2a2a2a]"
                     >
                       <td className="border-b border-[#252525] py-2 pl-3 text-left font-semibold text-[#dddddd]">
-                        {r.date}
+                        {r.dateLabel}
                       </td>
                       <td className="border-b border-[#252525] py-2 text-center">
                         <RoundTypeBadge type={r.type} />

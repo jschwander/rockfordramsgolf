@@ -3,6 +3,11 @@ import { Link, useOutletContext } from 'react-router-dom'
 import { supabase } from '../utils/supabase'
 import { calcPlayerStats } from '../utils/stats'
 import { playerDisplayName, playerInitials } from '../utils/players'
+import {
+  addDaysUtc,
+  startOfThisMonthUtcYMD,
+  todayUtcYMD,
+} from '../utils/dates'
 
 export function IndividualScores() {
   console.log('[IndividualScores] render')
@@ -13,6 +18,24 @@ export function IndividualScores() {
   const [players, setPlayers] = useState([])
   const [rounds, setRounds] = useState([])
   const [loadError, setLoadError] = useState(null)
+  const [datePreset, setDatePreset] = useState('all')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+
+  const resolvedRange = useMemo(() => {
+    const today = todayUtcYMD()
+    if (datePreset === 'all') return { from: null, to: null }
+    if (datePreset === 'last30')
+      return { from: addDaysUtc(today, -30), to: today }
+    if (datePreset === 'thisMonth')
+      return { from: startOfThisMonthUtcYMD(), to: today }
+    if (datePreset === 'custom')
+      return {
+        from: fromDate.trim() || null,
+        to: toDate.trim() || null,
+      }
+    return { from: null, to: null }
+  }, [datePreset, fromDate, toDate])
 
   const loadData = useCallback(async () => {
     console.log('[IndividualScores] loadData: starting Supabase parallel fetch')
@@ -26,6 +49,21 @@ export function IndividualScores() {
       })}`,
     )
     setLoadError(null)
+    const roundsQ = supabase
+      .from('rounds')
+      .select(
+        `
+          season_name,
+          date,
+          course_rating,
+          course_slope,
+          round_scores ( player_name, score )
+        `,
+      )
+      .order('date', { ascending: true })
+    if (resolvedRange.from) roundsQ.gte('date', resolvedRange.from)
+    if (resolvedRange.to) roundsQ.lte('date', resolvedRange.to)
+
     const [seasonRes, playersRes, roundsRes] = await Promise.all([
       supabase.from('seasons').select('name').order('name'),
       supabase
@@ -35,12 +73,7 @@ export function IndividualScores() {
         )
         .eq('active', true)
         .order('display_order'),
-      supabase.from('rounds').select(`
-          season_name,
-          course_rating,
-          course_slope,
-          round_scores ( player_name, score )
-        `),
+      roundsQ,
     ])
 
     console.log(
@@ -96,7 +129,7 @@ export function IndividualScores() {
         roundsCount: roundsRes.data?.length,
       })}`,
     )
-  }, [])
+  }, [resolvedRange.from, resolvedRange.to])
 
   useEffect(() => {
     loadData()
@@ -199,6 +232,54 @@ export function IndividualScores() {
             {s}
           </button>
         ))}
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <span className="text-[11px] font-bold uppercase tracking-wide text-[#888888]">
+          Date:
+        </span>
+        {[
+          ['all', 'All'],
+          ['last30', 'Last 30 days'],
+          ['thisMonth', 'This month'],
+          ['custom', 'Custom'],
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            className={[
+              'rounded-full border px-3 py-1 text-[11px] font-bold transition-colors',
+              datePreset === key
+                ? 'border-[#E8650A] bg-[#E8650A] text-white'
+                : 'border-[#333333] bg-transparent text-[#aaaaaa] hover:bg-[#2a2a2a] hover:text-white',
+            ].join(' ')}
+            onClick={() => setDatePreset(key)}
+          >
+            {label}
+          </button>
+        ))}
+        {datePreset === 'custom' ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1 text-xs text-[#888888]">
+              From
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="rounded-md border border-[#333333] bg-[#111111] px-2 py-1 text-xs text-white"
+              />
+            </label>
+            <label className="flex items-center gap-1 text-xs text-[#888888]">
+              To
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="rounded-md border border-[#333333] bg-[#111111] px-2 py-1 text-xs text-white"
+              />
+            </label>
+          </div>
+        ) : null}
       </div>
 
       <div className="rounded-lg border border-[#2a2a2a] bg-[#1A1A1A] p-4">

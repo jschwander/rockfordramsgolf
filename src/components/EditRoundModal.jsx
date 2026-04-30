@@ -344,10 +344,10 @@ export function EditRoundModal({
               Date
             </span>
             <input
+              type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
               className="rounded-md border border-[#333333] bg-[#111111] px-3 py-2 text-sm text-white focus:border-[#E8650A] focus:outline-none"
-              placeholder="e.g. 4/13"
               required
             />
           </label>

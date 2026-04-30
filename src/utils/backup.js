@@ -16,7 +16,7 @@ export async function exportDatabaseJson() {
     supabase.from('seasons').select('*').order('name'),
     supabase.from('courses').select('*').order('name'),
     supabase.from('players').select('*').order('season_name').order('display_order'),
-    supabase.from('rounds').select('*').order('date'),
+    supabase.from('rounds').select('*').order('date', { ascending: true }),
     supabase.from('round_scores').select('*'),
   ])
   if (seasons.error) throw seasons.error
