@@ -3,9 +3,24 @@ import { supabase } from '../utils/supabase'
 import { calcTeamScore } from '../utils/stats'
 import { playerDisplayName } from '../utils/players'
 
+const DSTAT_FIELDS = ['gir', 'fir', 'putts', 'penalties', 'updowns']
+const HOLE_FIELDS = ['eagles', 'birdies', 'pars', 'bogeys', 'doubles', 'other']
+
+function emptyDStats() {
+  const d = {}
+  for (const f of [...DSTAT_FIELDS, ...HOLE_FIELDS]) d[f] = ''
+  return d
+}
+
+function parseOptionalInt(v) {
+  const s = String(v ?? '').trim()
+  if (s === '') return null
+  const n = Number.parseInt(s, 10)
+  return Number.isNaN(n) ? null : n
+}
+
 /**
  * Simplified round editor: core fields + per-player scores (matches prototype workflow).
- * Detailed stats (GIR/FIR/…) stay unchanged in DB unless we add inputs later.
  */
 export function EditRoundModal({
   round,
@@ -25,6 +40,7 @@ export function EditRoundModal({
   const [finish, setFinish] = useState('')
   const [winScore, setWinScore] = useState('')
   const [scores, setScores] = useState({})
+  const [dStats, setDStats] = useState({})
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState(null)
 
@@ -63,16 +79,69 @@ export function EditRoundModal({
     setFinish(round.finish ?? '')
     setWinScore(round.win_score != null ? String(round.win_score) : '')
     const map = {}
+    const dsMap = {}
     for (const rs of round.round_scores ?? []) {
       if (rs.player_name && rs.score != null) map[rs.player_name] = String(rs.score)
       else if (rs.player_name) map[rs.player_name] = ''
+
+      if (rs.player_name && rs.score != null) {
+        dsMap[rs.player_name] = {
+          gir: rs.gir != null ? String(rs.gir) : '',
+          fir: rs.fir != null ? String(rs.fir) : '',
+          putts: rs.putts != null ? String(rs.putts) : '',
+          penalties: rs.penalties != null ? String(rs.penalties) : '',
+          updowns: rs.updowns != null ? String(rs.updowns) : '',
+          eagles: rs.eagles != null ? String(rs.eagles) : '',
+          birdies: rs.birdies != null ? String(rs.birdies) : '',
+          pars: rs.pars != null ? String(rs.pars) : '',
+          bogeys: rs.bogeys != null ? String(rs.bogeys) : '',
+          doubles: rs.doubles != null ? String(rs.doubles) : '',
+          other: rs.other != null ? String(rs.other) : '',
+        }
+      }
     }
     for (const n of orderedPlayerNames) {
       if (!(n in map)) map[n] = ''
     }
     setScores(map)
+    setDStats(dsMap)
     setErr(null)
   }, [open, round, orderedPlayerNames])
+
+  const playingPlayers = useMemo(() => {
+    if (type === 'Practice') return []
+    return orderedPlayerNames.filter((name) => {
+      const v = scores[name]?.trim()
+      return v != null && v !== ''
+    })
+  }, [orderedPlayerNames, scores, type])
+
+  useEffect(() => {
+    if (!open || !round) return
+    if (type === 'Practice') return
+    if (!playingPlayers.length) return
+    setDStats((prev) => {
+      const next = { ...prev }
+      for (const p of playingPlayers) {
+        if (!next[p]) next[p] = emptyDStats()
+      }
+      return next
+    })
+  }, [open, round, type, playingPlayers])
+
+  function holeSumFor(playerName) {
+    const d = dStats[playerName] ?? emptyDStats()
+    let total = 0
+    let any = false
+    for (const f of HOLE_FIELDS) {
+      const n = parseOptionalInt(d[f])
+      if (n != null) {
+        any = true
+        total += n
+      }
+    }
+    return { total, any, ok: any ? total === 9 : null }
+  }
 
   async function handleSave(e) {
     e.preventDefault()
@@ -109,6 +178,19 @@ export function EditRoundModal({
       setErr('Enter at least one score.')
       setSaving(false)
       return
+    }
+
+    if (type !== 'Practice') {
+      for (const playerName of playingPlayers) {
+        const hs = holeSumFor(playerName)
+        if (hs.any && hs.total !== 9) {
+          setErr(
+            `${playerName}: hole breakdown must total 9 (currently ${hs.total}).`,
+          )
+          setSaving(false)
+          return
+        }
+      }
     }
 
     const teamScore = calcTeamScore(numericScores)
@@ -152,11 +234,26 @@ export function EditRoundModal({
     }
 
     const inserts = orderedPlayerNames
-      .map((player_name, i) => ({
-        round_id: round.id,
-        player_name,
-        score: numericScores[i],
-      }))
+      .map((player_name, i) => {
+        const score = numericScores[i]
+        const ds = type !== 'Practice' ? dStats[player_name] : null
+        return {
+          round_id: round.id,
+          player_name,
+          score,
+          gir: score != null ? parseOptionalInt(ds?.gir) : null,
+          fir: score != null ? parseOptionalInt(ds?.fir) : null,
+          putts: score != null ? parseOptionalInt(ds?.putts) : null,
+          penalties: score != null ? parseOptionalInt(ds?.penalties) : null,
+          updowns: score != null ? parseOptionalInt(ds?.updowns) : null,
+          eagles: score != null ? parseOptionalInt(ds?.eagles) : null,
+          birdies: score != null ? parseOptionalInt(ds?.birdies) : null,
+          pars: score != null ? parseOptionalInt(ds?.pars) : null,
+          bogeys: score != null ? parseOptionalInt(ds?.bogeys) : null,
+          doubles: score != null ? parseOptionalInt(ds?.doubles) : null,
+          other: score != null ? parseOptionalInt(ds?.other) : null,
+        }
+      })
       .filter((row) => row.score != null)
 
     if (inserts.length) {
@@ -356,6 +453,112 @@ export function EditRoundModal({
             </label>
           ))}
         </div>
+
+        {type !== 'Practice' && playingPlayers.length ? (
+          <div className="mb-4 border-t border-[#2a2a2a] pt-4">
+            <div className="mb-3 text-[11px] font-bold uppercase tracking-wide text-white">
+              Detailed stats{' '}
+              <span className="text-[#888888] normal-case">
+                (Conference &amp; Non-Conference only)
+              </span>
+            </div>
+            <div className="space-y-3">
+              {playingPlayers.map((playerName) => {
+                const key = playerName
+                const ds = dStats[key] ?? emptyDStats()
+                const hs = holeSumFor(playerName)
+                return (
+                  <div
+                    key={key}
+                    className="rounded-lg border border-[#333333] bg-[#111111] p-3"
+                  >
+                    <div className="mb-2 text-sm font-bold text-white">
+                      {playerName}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                      {[
+                        ['gir', 'GIR', 9],
+                        ['fir', 'FIR', 9],
+                        ['putts', 'Putts', 99],
+                        ['penalties', 'Pen', 99],
+                        ['updowns', 'U&D', 99],
+                      ].map(([field, label, max]) => (
+                        <label key={field} className="flex flex-col gap-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-[#888888]">
+                            {label}
+                          </span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={max}
+                            value={ds[field] ?? ''}
+                            placeholder="—"
+                            onChange={(e) =>
+                              setDStats((prev) => ({
+                                ...prev,
+                                [key]: {
+                                  ...(prev[key] ?? emptyDStats()),
+                                  [field]: e.target.value,
+                                },
+                              }))
+                            }
+                            className="rounded-md border border-[#333333] bg-[#1A1A1A] px-2 py-2 text-sm text-white focus:border-[#E8650A] focus:outline-none"
+                          />
+                        </label>
+                      ))}
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
+                      {[
+                        ['eagles', 'Eagles'],
+                        ['birdies', 'Birdies'],
+                        ['pars', 'Pars'],
+                        ['bogeys', 'Bogeys'],
+                        ['doubles', 'Doubles'],
+                        ['other', 'Other'],
+                      ].map(([field, label]) => (
+                        <label key={field} className="flex flex-col gap-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-[#888888]">
+                            {label}
+                          </span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={9}
+                            value={ds[field] ?? ''}
+                            placeholder="0"
+                            onChange={(e) =>
+                              setDStats((prev) => ({
+                                ...prev,
+                                [key]: {
+                                  ...(prev[key] ?? emptyDStats()),
+                                  [field]: e.target.value,
+                                },
+                              }))
+                            }
+                            className="rounded-md border border-[#333333] bg-[#1A1A1A] px-2 py-2 text-sm text-white focus:border-[#E8650A] focus:outline-none"
+                          />
+                        </label>
+                      ))}
+                    </div>
+
+                    {hs.ok === null ? null : (
+                      <div
+                        className={[
+                          'mt-2 text-xs font-bold',
+                          hs.ok ? 'text-[#4caf50]' : 'text-[#ef5350]',
+                        ].join(' ')}
+                      >
+                        Hole total: {hs.total}/9 {hs.ok ? '✓' : '— must equal 9'}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ) : null}
 
         {err ? (
           <p className="mb-3 rounded-md border border-[#5e2e2e] bg-[#3a1a1a] px-3 py-2 text-sm text-[#ef5350]">

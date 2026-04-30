@@ -83,7 +83,21 @@ export function TeamScores() {
           team_score,
           finish,
           win_score,
-          round_scores ( player_name, score )
+          round_scores (
+            player_name,
+            score,
+            gir,
+            fir,
+            putts,
+            penalties,
+            updowns,
+            eagles,
+            birdies,
+            pars,
+            bogeys,
+            doubles,
+            other
+          )
         `,
         )
         .order('date'),
