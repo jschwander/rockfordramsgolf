@@ -81,6 +81,7 @@ export function TeamScores() {
           course_rating,
           course_slope,
           team_score,
+          team_score_override,
           finish,
           win_score,
           round_scores (
@@ -254,7 +255,8 @@ export function TeamScores() {
     const nums = (r.round_scores ?? [])
       .map((x) => x.score)
       .filter((s) => s != null)
-    return r.team_score ?? calcTeamScore(nums)
+    if (r.team_score_override) return r.team_score ?? null
+    return calcTeamScore(nums)
   }
 
   if (loadError) {
@@ -433,7 +435,17 @@ export function TeamScores() {
                   const ts = teamScoreForRound(r)
                   const tsStr =
                     ts != null ? (
-                      <span className="font-bold text-[#4caf50]">{ts}</span>
+                      <span className="font-bold text-[#4caf50]">
+                        {ts}
+                        {r.team_score_override ? (
+                          <span
+                            className="ml-0.5 align-super text-[10px] text-[#aaaaaa]"
+                            title="Manually overridden team score"
+                          >
+                            *
+                          </span>
+                        ) : null}
+                      </span>
                     ) : (
                       <span className="text-[#444444]">—</span>
                     )

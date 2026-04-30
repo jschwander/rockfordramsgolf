@@ -39,6 +39,8 @@ export function AddRoundModal({ open, onClose, onSaved }) {
   const [winScore, setWinScore] = useState('')
   const [scores, setScores] = useState({})
   const [dStats, setDStats] = useState({})
+  const [teamScoreOverride, setTeamScoreOverride] = useState(false)
+  const [teamScoreManual, setTeamScoreManual] = useState('')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState(null)
 
@@ -106,6 +108,8 @@ export function AddRoundModal({ open, onClose, onSaved }) {
       setWinScore('')
       setScores({})
       setDStats({})
+      setTeamScoreOverride(false)
+      setTeamScoreManual('')
       setErr(null)
       setLoading(false)
     })()
@@ -210,6 +214,12 @@ export function AddRoundModal({ open, onClose, onSaved }) {
     }
 
     const teamScore = calcTeamScore(numericScores)
+    const manualTeamScore = parseOptionalInt(teamScoreManual)
+    if (teamScoreOverride && manualTeamScore == null) {
+      setErr('Enter a manual Team Score, or uncheck override.')
+      setSaving(false)
+      return
+    }
     const wsRaw =
       type !== 'Practice' && winScore.trim()
         ? parseInt(winScore, 10)
@@ -222,7 +232,8 @@ export function AddRoundModal({ open, onClose, onSaved }) {
       course_name: courseName.trim(),
       course_rating: ratingNum,
       course_slope: slopeNum,
-      team_score: teamScore,
+      team_score: teamScoreOverride ? manualTeamScore : teamScore,
+      team_score_override: !!teamScoreOverride,
       finish:
         type !== 'Practice' && finish.trim() ? finish.trim() : null,
       win_score: Number.isFinite(wsRaw) ? wsRaw : null,
@@ -452,6 +463,56 @@ export function AddRoundModal({ open, onClose, onSaved }) {
                 </label>
               </div>
             ) : null}
+
+            <div className="mb-4 grid grid-cols-1 gap-2 border-t border-[#2a2a2a] pt-4 sm:grid-cols-3 sm:items-end">
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-[#888888]">
+                  Team Score
+                </span>
+                <input
+                  type="number"
+                  value={
+                    teamScoreOverride
+                      ? teamScoreManual
+                      : (() => {
+                          const nums = orderedPlayerNames
+                            .map((n) => parseOptionalInt(scores[n]))
+                            .filter((v) => v != null)
+                          const auto = calcTeamScore(nums)
+                          return auto != null ? String(auto) : ''
+                        })()
+                  }
+                  disabled={!teamScoreOverride}
+                  onChange={(e) => setTeamScoreManual(e.target.value)}
+                  placeholder="—"
+                  className={[
+                    'rounded-md border px-3 py-2 text-sm text-white focus:outline-none',
+                    teamScoreOverride
+                      ? 'border-[#333333] bg-[#111111] focus:border-[#E8650A]'
+                      : 'border-[#333333] bg-[#111111] opacity-70',
+                  ].join(' ')}
+                />
+              </label>
+              <label className="flex items-center gap-2 text-sm text-[#aaaaaa] sm:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={teamScoreOverride}
+                  onChange={(e) => {
+                    const checked = e.target.checked
+                    setTeamScoreOverride(checked)
+                    if (checked) {
+                      const nums = orderedPlayerNames
+                        .map((n) => parseOptionalInt(scores[n]))
+                        .filter((v) => v != null)
+                      const auto = calcTeamScore(nums)
+                      setTeamScoreManual(auto != null ? String(auto) : '')
+                    }
+                  }}
+                  className="h-4 w-4 accent-[#E8650A]"
+                />
+                <span className="font-bold">Override auto-calculation</span>
+              </label>
+            </div>
 
             <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[#888888]">
               9-hole scores — blank = did not play
