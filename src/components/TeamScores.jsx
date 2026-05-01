@@ -4,6 +4,14 @@ import { supabase } from '../utils/supabase'
 import { calcTeamScore } from '../utils/stats'
 import { ROUND_TYPES } from '../constants'
 import { RoundTypeBadge } from './ui/RoundTypeBadge'
+import {
+  FILTER_BAR_ROUND_TYPE_TONE,
+  FilterBarDivider,
+  FilterBarGroup,
+  FilterBarLabel,
+  FilterBarPill,
+  FilterBarRow,
+} from './ui/FilterBar'
 import { Tooltip } from './ui/Tooltip'
 import { EditRoundModal } from './EditRoundModal'
 import { useAuth } from '../hooks/useAuth'
@@ -307,105 +315,74 @@ export function TeamScores() {
           </span>
         </div>
 
-        <div className="mb-3.5 flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-[#888888]">
-            Season:
-          </span>
-          {['all', ...seasons].map((s) => (
-            <button
-              key={s}
-              type="button"
-              className={[
-                'rounded-full border px-3.5 py-1 text-xs font-bold transition-colors',
-                tsSeasonFilter === s
-                  ? 'border-[#E8650A] bg-[#E8650A] text-white'
-                  : 'border-[#333333] bg-transparent text-[#aaaaaa] hover:bg-[#2a2a2a] hover:text-white',
-              ].join(' ')}
-              onClick={() => setTsSeasonFilter(s)}
-            >
-              {s === 'all' ? 'All' : s}
-            </button>
-          ))}
-        </div>
-
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-[#888888]">
-            Type:
-          </span>
-          {ROUND_TYPES.map((t) => {
-            const active = tsTypeFilter.has(t)
-            const key = t.replace(/-/g, '').replace(/ /g, '').toLowerCase()
-            const checkedClass = active
-              ? {
-                  Practice: 'border-[#2e5e2e] bg-[#1a3a1a] text-[#4caf50]',
-                  Conference: 'border-[#1e4a8a] bg-[#1a2a4a] text-[#64b5f6]',
-                  'Non-Conference':
-                    'border-[#7a5010] bg-[#3a2a1a] text-[#ffb74d]',
-                }[t]
-              : 'border-[#333333] text-[#aaaaaa]'
-            return (
-              <button
+        <FilterBarRow>
+          <FilterBarGroup>
+            <FilterBarLabel>Season:</FilterBarLabel>
+            {['all', ...seasons].map((s) => (
+              <FilterBarPill
+                key={s}
+                active={tsSeasonFilter === s}
+                onClick={() => setTsSeasonFilter(s)}
+              >
+                {s === 'all' ? 'All-Time' : s}
+              </FilterBarPill>
+            ))}
+          </FilterBarGroup>
+          <FilterBarDivider />
+          <FilterBarGroup>
+            <FilterBarLabel>Type:</FilterBarLabel>
+            {ROUND_TYPES.map((t) => (
+              <FilterBarPill
                 key={t}
-                type="button"
-                className={[
-                  'flex min-h-[36px] cursor-pointer items-center rounded-full border px-3 py-1 text-[11px] font-bold transition-colors hover:bg-[#2a2a2a]',
-                  checkedClass,
-                ].join(' ')}
+                tone={FILTER_BAR_ROUND_TYPE_TONE[t]}
+                active={tsTypeFilter.has(t)}
                 onClick={() => toggleType(t)}
               >
                 {t}
-              </button>
-            )
-          })}
-        </div>
-
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-[#888888]">
-            Date:
-          </span>
-          {[
-            ['all', 'All'],
-            ['last30', 'Last 30 days'],
-            ['thisMonth', 'This month'],
-            ['custom', 'Custom'],
-          ].map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              className={[
-                'rounded-full border px-3 py-1 text-[11px] font-bold transition-colors',
-                datePreset === key
-                  ? 'border-[#E8650A] bg-[#E8650A] text-white'
-                  : 'border-[#333333] bg-transparent text-[#aaaaaa] hover:bg-[#2a2a2a] hover:text-white',
-              ].join(' ')}
-              onClick={() => setDatePreset(key)}
-            >
-              {label}
-            </button>
-          ))}
-          {datePreset === 'custom' ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <label className="flex items-center gap-1 text-xs text-[#888888]">
-                From
-                <input
-                  type="date"
-                  value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className="rounded-md border border-[#333333] bg-[#111111] px-2 py-1 text-xs text-white"
-                />
-              </label>
-              <label className="flex items-center gap-1 text-xs text-[#888888]">
-                To
-                <input
-                  type="date"
-                  value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className="rounded-md border border-[#333333] bg-[#111111] px-2 py-1 text-xs text-white"
-                />
-              </label>
-            </div>
-          ) : null}
-        </div>
+              </FilterBarPill>
+            ))}
+          </FilterBarGroup>
+          <FilterBarDivider />
+          <FilterBarGroup>
+            <FilterBarLabel>Date:</FilterBarLabel>
+            {[
+              ['all', 'All'],
+              ['last30', 'Last 30 days'],
+              ['thisMonth', 'This month'],
+              ['custom', 'Custom'],
+            ].map(([key, label]) => (
+              <FilterBarPill
+                key={key}
+                active={datePreset === key}
+                onClick={() => setDatePreset(key)}
+              >
+                {label}
+              </FilterBarPill>
+            ))}
+            {datePreset === 'custom' ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="flex items-center gap-1 text-xs text-[#888888]">
+                  From
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="rounded-md border border-[#333333] bg-[#111111] px-2 py-1 text-xs text-white"
+                  />
+                </label>
+                <label className="flex items-center gap-1 text-xs text-[#888888]">
+                  To
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="rounded-md border border-[#333333] bg-[#111111] px-2 py-1 text-xs text-white"
+                  />
+                </label>
+              </div>
+            ) : null}
+          </FilterBarGroup>
+        </FilterBarRow>
 
         <p className="note mb-2.5 text-xs leading-snug text-[#777777]">
           Click ✏ to edit a round including detailed stats.
