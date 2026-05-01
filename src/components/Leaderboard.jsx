@@ -235,12 +235,6 @@ export function Leaderboard() {
     return list.map((s, i) => ({ ...s, rank: i + 1 }))
   }, [filteredRounds, playerOrder, sortKey, sortDir])
 
-  const byDiffSorted = useMemo(() => {
-    return [...rows]
-      .filter((s) => s.avgDiff != null)
-      .sort((a, b) => a.avgDiff - b.avgDiff)
-  }, [rows])
-
   const seasonSubtitle =
     filterSeason === 'all'
       ? 'All seasons — course-adjusted performance tracker'
@@ -302,31 +296,6 @@ export function Leaderboard() {
 
   return (
     <div>
-      <div className="mb-3 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-        <div className="rounded-lg border border-[#2a2a2a] bg-[#1A1A1A] p-3.5 text-center">
-          <div className="text-[26px] font-bold text-[#E8650A]">
-            {filteredRounds.length}
-          </div>
-          <div className="mt-1 text-[10px] font-bold uppercase tracking-wide text-[#666666]">
-            Rounds
-          </div>
-        </div>
-        <div className="rounded-lg border border-[#2a2a2a] bg-[#1A1A1A] p-3.5 text-center">
-          <div className="text-[26px] font-bold text-[#E8650A]">{rows.length}</div>
-          <div className="mt-1 text-[10px] font-bold uppercase tracking-wide text-[#666666]">
-            Active players
-          </div>
-        </div>
-        <div className="rounded-lg border border-[#2a2a2a] bg-[#1A1A1A] p-3.5 text-center">
-          <div className="text-[26px] font-bold text-[#E8650A]">
-            {byDiffSorted.length ? byDiffSorted[0].avgDiff.toFixed(2) : '—'}
-          </div>
-          <div className="mt-1 text-[10px] font-bold uppercase tracking-wide text-[#666666]">
-            Best avg diff
-          </div>
-        </div>
-      </div>
-
       <div className="rounded-lg border border-[#2a2a2a] bg-[#1A1A1A] p-4">
         <div className="mb-3.5 border-b-2 border-[#E8650A] pb-2 text-[11px] font-bold uppercase tracking-wide text-white">
           Team leaderboard
