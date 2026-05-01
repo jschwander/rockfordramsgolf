@@ -31,6 +31,88 @@ import {
  *   scramblePct: number|null,
  * }} PlayerRoundRow */
 
+function parseSortNumber(v) {
+  if (v == null || v === '') return null
+  const n = typeof v === 'number' ? v : Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
+/** Value used for sorting; null / unusable means “no data” (sorts to bottom). */
+function getRoundSortValue(row, sortKey) {
+  switch (sortKey) {
+    case 'date': {
+      if (!row.date) return null
+      const t = Date.parse(`${row.date}T00:00:00Z`)
+      return Number.isFinite(t) ? t : null
+    }
+    case 'type': {
+      const s = row.type != null ? String(row.type).trim() : ''
+      return s === '' ? null : s
+    }
+    case 'course': {
+      const s = row.course != null ? String(row.course).trim() : ''
+      return s === '' ? null : s
+    }
+    case 'score':
+      return parseSortNumber(row.score)
+    case 'diff':
+      return parseSortNumber(row.diff)
+    case 'gir':
+      return parseSortNumber(row.ds?.gir)
+    case 'fir':
+      return parseSortNumber(row.ds?.fir)
+    case 'putts':
+      return parseSortNumber(row.ds?.putts)
+    case 'pen':
+      return parseSortNumber(row.ds?.penalties)
+    case 'ud':
+      return parseSortNumber(row.ds?.updowns)
+    case 'scr':
+      return parseSortNumber(row.scramblePct)
+    case 'eagles':
+      return parseSortNumber(row.ds?.eagles)
+    case 'birdies':
+      return parseSortNumber(row.ds?.birdies)
+    case 'pars':
+      return parseSortNumber(row.ds?.pars)
+    case 'bogeys':
+      return parseSortNumber(row.ds?.bogeys)
+    case 'doubles':
+      return parseSortNumber(row.ds?.doubles)
+    case 'other':
+      return parseSortNumber(row.ds?.other)
+    default:
+      return null
+  }
+}
+
+function tieBreakRoundRows(a, b) {
+  const at = Date.parse(`${a.date}T00:00:00Z`) || 0
+  const bt = Date.parse(`${b.date}T00:00:00Z`) || 0
+  return at - bt
+}
+
+function compareRoundRows(a, b, sortKey, sortDir) {
+  const va = getRoundSortValue(a, sortKey)
+  const vb = getRoundSortValue(b, sortKey)
+  const strKeys = sortKey === 'type' || sortKey === 'course'
+  const aMiss = va == null || (strKeys && va === '')
+  const bMiss = vb == null || (strKeys && vb === '')
+  if (aMiss && bMiss) return tieBreakRoundRows(a, b)
+  if (aMiss) return 1
+  if (bMiss) return -1
+  let cmp = 0
+  if (strKeys) {
+    cmp = String(va).localeCompare(String(vb), undefined, {
+      sensitivity: 'base',
+    })
+  } else {
+    cmp = va - vb
+  }
+  if (cmp !== 0) return sortDir * cmp
+  return tieBreakRoundRows(a, b)
+}
+
 function buildDs(rs) {
   if (!rs) return null
   const keys = [
@@ -81,6 +163,8 @@ export function PlayerProfile() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [chartsOpen, setChartsOpen] = useState(false)
+  const [sortKey, setSortKey] = useState('date')
+  const [sortDir, setSortDir] = useState(1)
 
   const load = useCallback(async () => {
     if (!playerName) return
@@ -218,6 +302,23 @@ export function PlayerProfile() {
       return true
     })
   }, [allRows, filterTypes, datePreset, fromDate, toDate])
+
+  const sortedPlayerRounds = useMemo(() => {
+    const rows = [...playerRounds]
+    rows.sort((a, b) => compareRoundRows(a, b, sortKey, sortDir))
+    return rows
+  }, [playerRounds, sortKey, sortDir])
+
+  const setRoundSort = useCallback((nextKey) => {
+    setSortKey((prev) => {
+      if (prev === nextKey) {
+        setSortDir((d) => -d)
+        return prev
+      }
+      setSortDir(1)
+      return nextKey
+    })
+  }, [])
 
   const chartLabels = useMemo(
     () => playerRounds.map((_, i) => `Rnd ${i + 1}`),
@@ -486,117 +587,121 @@ export function PlayerProfile() {
           <table className="min-w-[900px] w-full border-collapse text-xs">
             <thead>
               <tr>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] py-2.5 pl-3 text-left text-[11px] font-bold text-white">
-                  Date
-                </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] py-2.5 text-center text-[11px] font-bold text-white">
-                  Type
-                </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] py-2.5 text-center text-[11px] font-bold text-white">
-                  Course
-                </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] py-2.5 text-center text-[11px] font-bold text-white">
-                  Score
-                </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] py-2.5 text-center text-[11px] font-bold text-white">
-                  Diff
-                </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
-                  <div className="flex justify-center">
-                    <Tooltip
-                      label="GIR"
-                      tip="Greens in Regulation out of 9"
-                    />
-                  </div>
-                </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
-                  <div className="flex justify-center">
-                    <Tooltip
-                      label="FIR"
-                      tip="Fairways in Regulation out of 9"
-                    />
-                  </div>
-                </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
-                  <div className="flex justify-center">
-                    <Tooltip
-                      label="Putts"
-                      tip="Total putts taken during the round"
-                    />
-                  </div>
-                </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
-                  <div className="flex justify-center">
-                    <Tooltip
-                      label="Pen"
-                      tip="Penalty strokes — out of bounds, hazards, lost balls"
-                    />
-                  </div>
-                </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
-                  <div className="flex justify-center">
-                    <Tooltip
-                      label="U&D"
-                      tip="Up and Downs — times you got up and down after missing a green"
-                    />
-                  </div>
-                </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
-                  <div className="flex justify-center">
-                    <Tooltip
-                      label="Scr%"
-                      tip="Scramble % — Up & Downs divided by greens missed. Higher is better"
-                    />
-                  </div>
-                </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
-                  <div className="flex justify-center">
-                    <Tooltip
-                      label="Eagles"
-                      tip="Holes completed 2 under par"
-                    />
-                  </div>
-                </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
-                  <div className="flex justify-center">
-                    <Tooltip
-                      label="Birdies"
-                      tip="Holes completed 1 under par"
-                    />
-                  </div>
-                </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
-                  <div className="flex justify-center">
-                    <Tooltip
-                      label="Pars"
-                      tip="Holes completed at par"
-                    />
-                  </div>
-                </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
-                  <div className="flex justify-center">
-                    <Tooltip
-                      label="Bogeys"
-                      tip="Holes completed 1 over par"
-                    />
-                  </div>
-                </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
-                  <div className="flex justify-center">
-                    <Tooltip
-                      label="Doubles"
-                      tip="Holes completed 2 over par"
-                    />
-                  </div>
-                </th>
-                <th className="cursor-default border-b-2 border-[#E8650A] bg-[#111111] px-1 py-2.5 text-center text-[11px] font-bold text-white">
-                  <div className="flex justify-center">
-                    <Tooltip
-                      label="Other"
-                      tip="Holes completed 3 or more over par"
-                    />
-                  </div>
-                </th>
+                <RoundHeaderCell
+                  label="Date"
+                  sorted={sortKey === 'date'}
+                  dir={sortDir}
+                  onSort={() => setRoundSort('date')}
+                  align="left"
+                />
+                <RoundHeaderCell
+                  label="Type"
+                  sorted={sortKey === 'type'}
+                  dir={sortDir}
+                  onSort={() => setRoundSort('type')}
+                />
+                <RoundHeaderCell
+                  label="Course"
+                  sorted={sortKey === 'course'}
+                  dir={sortDir}
+                  onSort={() => setRoundSort('course')}
+                />
+                <RoundHeaderCell
+                  label="Score"
+                  sorted={sortKey === 'score'}
+                  dir={sortDir}
+                  onSort={() => setRoundSort('score')}
+                />
+                <RoundHeaderCell
+                  label="Diff"
+                  sorted={sortKey === 'diff'}
+                  dir={sortDir}
+                  onSort={() => setRoundSort('diff')}
+                />
+                <RoundHeaderCell
+                  label="GIR"
+                  tip="Greens in Regulation out of 9"
+                  sorted={sortKey === 'gir'}
+                  dir={sortDir}
+                  onSort={() => setRoundSort('gir')}
+                />
+                <RoundHeaderCell
+                  label="FIR"
+                  tip="Fairways in Regulation out of 9"
+                  sorted={sortKey === 'fir'}
+                  dir={sortDir}
+                  onSort={() => setRoundSort('fir')}
+                />
+                <RoundHeaderCell
+                  label="Putts"
+                  tip="Total putts taken during the round"
+                  sorted={sortKey === 'putts'}
+                  dir={sortDir}
+                  onSort={() => setRoundSort('putts')}
+                />
+                <RoundHeaderCell
+                  label="Pen"
+                  tip="Penalty strokes — out of bounds, hazards, lost balls"
+                  sorted={sortKey === 'pen'}
+                  dir={sortDir}
+                  onSort={() => setRoundSort('pen')}
+                />
+                <RoundHeaderCell
+                  label="U&D"
+                  tip="Up and Downs — times you got up and down after missing a green"
+                  sorted={sortKey === 'ud'}
+                  dir={sortDir}
+                  onSort={() => setRoundSort('ud')}
+                />
+                <RoundHeaderCell
+                  label="Scr%"
+                  tip="Scramble % — Up & Downs divided by greens missed. Higher is better"
+                  sorted={sortKey === 'scr'}
+                  dir={sortDir}
+                  onSort={() => setRoundSort('scr')}
+                />
+                <RoundHeaderCell
+                  label="Eagles"
+                  tip="Holes completed 2 under par"
+                  sorted={sortKey === 'eagles'}
+                  dir={sortDir}
+                  onSort={() => setRoundSort('eagles')}
+                />
+                <RoundHeaderCell
+                  label="Birdies"
+                  tip="Holes completed 1 under par"
+                  sorted={sortKey === 'birdies'}
+                  dir={sortDir}
+                  onSort={() => setRoundSort('birdies')}
+                />
+                <RoundHeaderCell
+                  label="Pars"
+                  tip="Holes completed at par"
+                  sorted={sortKey === 'pars'}
+                  dir={sortDir}
+                  onSort={() => setRoundSort('pars')}
+                />
+                <RoundHeaderCell
+                  label="Bogeys"
+                  tip="Holes completed 1 over par"
+                  sorted={sortKey === 'bogeys'}
+                  dir={sortDir}
+                  onSort={() => setRoundSort('bogeys')}
+                />
+                <RoundHeaderCell
+                  label="Doubles"
+                  tip="Holes completed 2 over par"
+                  sorted={sortKey === 'doubles'}
+                  dir={sortDir}
+                  onSort={() => setRoundSort('doubles')}
+                />
+                <RoundHeaderCell
+                  label="Other"
+                  tip="Holes completed 3 or more over par"
+                  sorted={sortKey === 'other'}
+                  dir={sortDir}
+                  onSort={() => setRoundSort('other')}
+                />
               </tr>
             </thead>
             <tbody>
@@ -610,7 +715,7 @@ export function PlayerProfile() {
                   </td>
                 </tr>
               ) : (
-                playerRounds.map((r) => {
+                sortedPlayerRounds.map((r) => {
                   const diffStr =
                     r.diff != null ? r.diff.toFixed(2) : '—'
                   const diffCls =
@@ -699,5 +804,32 @@ export function PlayerProfile() {
         </Link>
       </p>
     </div>
+  )
+}
+
+function RoundHeaderCell({ label, tip, sorted, dir, onSort, align = 'center' }) {
+  return (
+    <th
+      className={[
+        'cursor-pointer select-none border-b-2 border-[#E8650A] bg-[#111111] py-2.5 text-[11px] font-bold whitespace-nowrap hover:text-[#E8650A]',
+        align === 'left' ? 'pl-3 text-left' : 'px-2 text-center',
+        sorted ? 'text-[#E8650A]' : 'text-white',
+      ].join(' ')}
+      onClick={(e) => {
+        e.stopPropagation()
+        onSort()
+      }}
+    >
+      {tip ? (
+        <Tooltip label={label} tip={tip} />
+      ) : (
+        <span>{label}</span>
+      )}
+      <span
+        className={`ml-0.5 text-[9px] ${sorted ? 'opacity-100' : 'opacity-50'}`}
+      >
+        {sorted ? (dir === 1 ? '▲' : '▼') : '▲'}
+      </span>
+    </th>
   )
 }
