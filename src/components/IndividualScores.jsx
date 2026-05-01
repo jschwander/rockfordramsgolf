@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { supabase } from '../utils/supabase'
-import { calcPlayerStats } from '../utils/stats'
+import { calcPlayerStats, calcScramble } from '../utils/stats'
 import { playerDisplayName, playerInitials } from '../utils/players'
 import {
   addDaysUtc,
   startOfThisMonthUtcYMD,
   todayUtcYMD,
 } from '../utils/dates'
+import { Tooltip } from './ui/Tooltip'
 import {
   FilterBarDivider,
   FilterBarGroup,
@@ -15,6 +16,42 @@ import {
   FilterBarPill,
   FilterBarRow,
 } from './ui/FilterBar'
+
+function parseSortNumber(v) {
+  if (v == null || v === '') return null
+  const n = typeof v === 'number' ? v : Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
+function avg(arr) {
+  if (!arr.length) return null
+  return arr.reduce((a, b) => a + b, 0) / arr.length
+}
+
+function compareAdvancedRows(a, b, key, dir) {
+  const isString = key === 'player'
+  const av = a[key]
+  const bv = b[key]
+  const na =
+    av === null ||
+    av === undefined ||
+    Number.isNaN(av) ||
+    (isString && String(av).trim() === '')
+  const nb =
+    bv === null ||
+    bv === undefined ||
+    Number.isNaN(bv) ||
+    (isString && String(bv).trim() === '')
+
+  // Missing values always sort to bottom (both directions).
+  if (na && nb) return 0
+  if (na) return 1
+  if (nb) return -1
+
+  if (isString) return dir * String(av).localeCompare(String(bv), undefined, { sensitivity: 'base' })
+  if (av !== bv) return dir * (av - bv)
+  return 0
+}
 
 export function IndividualScores() {
   console.log('[IndividualScores] render')
@@ -24,10 +61,13 @@ export function IndividualScores() {
   const [seasonFilter, setSeasonFilter] = useState('2026')
   const [players, setPlayers] = useState([])
   const [rounds, setRounds] = useState([])
+  const [detailedScoreRows, setDetailedScoreRows] = useState([])
   const [loadError, setLoadError] = useState(null)
   const [datePreset, setDatePreset] = useState('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [sortKey, setSortKey] = useState('avgGir')
+  const [sortDir, setSortDir] = useState(-1)
 
   const resolvedRange = useMemo(() => {
     const today = todayUtcYMD()
@@ -44,6 +84,17 @@ export function IndividualScores() {
     return { from: null, to: null }
   }, [datePreset, fromDate, toDate])
 
+  function setSort(nextKey) {
+    setSortKey((prev) => {
+      if (prev === nextKey) {
+        setSortDir((d) => -d)
+        return prev
+      }
+      setSortDir(1)
+      return nextKey
+    })
+  }
+
   const loadData = useCallback(async () => {
     console.log('[IndividualScores] loadData: starting Supabase parallel fetch')
     console.log(
@@ -53,6 +104,8 @@ export function IndividualScores() {
           'from(players).select(...).eq(active,true).order(display_order)',
         rounds:
           'from(rounds).select(season_name, course_rating, course_slope, round_scores(player_name, score))',
+        detailed:
+          'from(round_scores).select(player_name,gir,..., rounds(season_name,date)).not(gir,is,null)',
       })}`,
     )
     setLoadError(null)
@@ -71,7 +124,28 @@ export function IndividualScores() {
     if (resolvedRange.from) roundsQ.gte('date', resolvedRange.from)
     if (resolvedRange.to) roundsQ.lte('date', resolvedRange.to)
 
-    const [seasonRes, playersRes, roundsRes] = await Promise.all([
+    const detailedQ = supabase
+      .from('round_scores')
+      .select(
+        `
+          player_name,
+          gir,
+          fir,
+          putts,
+          penalties,
+          updowns,
+          eagles,
+          birdies,
+          pars,
+          bogeys,
+          doubles,
+          other,
+          rounds ( season_name, date )
+        `,
+      )
+      .not('gir', 'is', null)
+
+    const [seasonRes, playersRes, roundsRes, detailedRes] = await Promise.all([
       supabase.from('seasons').select('name').order('name'),
       supabase
         .from('players')
@@ -81,6 +155,7 @@ export function IndividualScores() {
         .eq('active', true)
         .order('display_order'),
       roundsQ,
+      detailedQ,
     ])
 
     console.log(
@@ -124,16 +199,23 @@ export function IndividualScores() {
       setLoadError(roundsRes.error.message)
       return
     }
+    if (detailedRes.error) {
+      console.error('[IndividualScores] detailed round_scores error:', detailedRes.error)
+      setLoadError(detailedRes.error.message)
+      return
+    }
 
     const seasonNames = (seasonRes.data ?? []).map((r) => r.name)
     setSeasons(seasonNames)
     setPlayers(playersRes.data ?? [])
     setRounds(roundsRes.data ?? [])
+    setDetailedScoreRows(detailedRes.data ?? [])
     console.log(
       `[IndividualScores] loadData: success, state updated ${JSON.stringify({
         seasonNames,
         playersCount: playersRes.data?.length,
         roundsCount: roundsRes.data?.length,
+        detailedCount: detailedRes.data?.length,
       })}`,
     )
   }, [resolvedRange.from, resolvedRange.to])
@@ -205,7 +287,133 @@ export function IndividualScores() {
     })
   }, [rosterForSeason, roundsForSeason, seasonFilter])
 
-  const subtitle = `Individual scores — ${seasonFilter} roster`
+  const advancedRows = useMemo(() => {
+    const from = resolvedRange.from
+    const to = resolvedRange.to
+
+    const byPlayer = new Map()
+    for (const row of detailedScoreRows) {
+      const pn = (row?.player_name ?? '').trim()
+      if (!pn) continue
+      const r = row?.rounds
+      const season = r?.season_name
+      const date = r?.date
+      if (!season || season !== seasonFilter) continue
+      if (from && String(date) < from) continue
+      if (to && String(date) > to) continue
+      if (!byPlayer.has(pn)) byPlayer.set(pn, [])
+      byPlayer.get(pn).push(row)
+    }
+
+    const fmt = (v, dec = 1) =>
+      v != null && !Number.isNaN(v) ? v.toFixed(dec) : '—'
+    const fmtPct = (v) =>
+      v != null && !Number.isNaN(v) ? `${Math.round(v)}%` : '—'
+
+    const rows = rosterForSeason.map((p) => {
+      const name = playerDisplayName(p)
+      const arr = byPlayer.get(name) ?? []
+      const n = arr.length
+      if (!n) {
+        return {
+          id: name,
+          player: name,
+          rounds: null,
+          avgGir: null,
+          avgFir: null,
+          avgPutts: null,
+          avgPen: null,
+          avgUd: null,
+          scrPct: null,
+          avgEagles: null,
+          avgBirdies: null,
+          avgPars: null,
+          avgBogeys: null,
+          avgDoubles: null,
+          avgOther: null,
+          display: {
+            rounds: '—',
+            avgGir: '—',
+            avgFir: '—',
+            avgPutts: '—',
+            avgPen: '—',
+            avgUd: '—',
+            scrPct: '—',
+            avgEagles: '—',
+            avgBirdies: '—',
+            avgPars: '—',
+            avgBogeys: '—',
+            avgDoubles: '—',
+            avgOther: '—',
+          },
+        }
+      }
+
+      const girs = arr.map((r) => parseSortNumber(r.gir)).filter((v) => v != null)
+      const firs = arr.map((r) => parseSortNumber(r.fir)).filter((v) => v != null)
+      const putts = arr.map((r) => parseSortNumber(r.putts)).filter((v) => v != null)
+      const pens = arr.map((r) => parseSortNumber(r.penalties)).filter((v) => v != null)
+      const uds = arr.map((r) => parseSortNumber(r.updowns)).filter((v) => v != null)
+
+      const scrs = arr
+        .map((r) => calcScramble(parseSortNumber(r.gir), parseSortNumber(r.updowns)))
+        .filter((v) => v != null)
+
+      const eagles = arr.map((r) => parseSortNumber(r.eagles ?? 0) ?? 0)
+      const birdies = arr.map((r) => parseSortNumber(r.birdies ?? 0) ?? 0)
+      const pars = arr.map((r) => parseSortNumber(r.pars ?? 0) ?? 0)
+      const bogeys = arr.map((r) => parseSortNumber(r.bogeys ?? 0) ?? 0)
+      const doubles = arr.map((r) => parseSortNumber(r.doubles ?? 0) ?? 0)
+      const other = arr.map((r) => parseSortNumber(r.other ?? 0) ?? 0)
+
+      const stats = {
+        rounds: n,
+        avgGir: avg(girs),
+        avgFir: avg(firs),
+        avgPutts: avg(putts),
+        avgPen: avg(pens),
+        avgUd: avg(uds),
+        scrPct: avg(scrs),
+        avgEagles: avg(eagles),
+        avgBirdies: avg(birdies),
+        avgPars: avg(pars),
+        avgBogeys: avg(bogeys),
+        avgDoubles: avg(doubles),
+        avgOther: avg(other),
+      }
+
+      return {
+        id: name,
+        player: name,
+        ...stats,
+        display: {
+          rounds: String(n),
+          avgGir: fmt(stats.avgGir, 1),
+          avgFir: fmt(stats.avgFir, 1),
+          avgPutts: fmt(stats.avgPutts, 1),
+          avgPen: fmt(stats.avgPen, 1),
+          avgUd: fmt(stats.avgUd, 1),
+          scrPct: fmtPct(stats.scrPct),
+          avgEagles: fmt(stats.avgEagles, 2),
+          avgBirdies: fmt(stats.avgBirdies, 2),
+          avgPars: fmt(stats.avgPars, 2),
+          avgBogeys: fmt(stats.avgBogeys, 2),
+          avgDoubles: fmt(stats.avgDoubles, 2),
+          avgOther: fmt(stats.avgOther, 2),
+        },
+      }
+    })
+
+    rows.sort((a, b) => {
+      const c = compareAdvancedRows(a, b, sortKey, sortDir)
+      if (c !== 0) return c
+      return a.player.localeCompare(b.player)
+    })
+
+    return rows
+  }, [detailedScoreRows, resolvedRange.from, resolvedRange.to, rosterForSeason, seasonFilter, sortDir, sortKey])
+
+  const subtitle = `Advanced stats — ${seasonFilter} roster`
   useEffect(() => {
     setSeasonLine?.(subtitle)
   }, [subtitle, setSeasonLine])
@@ -277,7 +485,7 @@ export function IndividualScores() {
 
       <div className="rounded-lg border border-[#2a2a2a] bg-[#1A1A1A] p-4">
         <div className="mb-3.5 border-b-2 border-[#E8650A] pb-2 text-[11px] font-bold uppercase tracking-wide text-white">
-          Individual scores — {seasonFilter} roster
+          Advanced stats — {seasonFilter} roster
         </div>
         <p className="note mb-4 text-xs leading-snug text-[#777777]">
           Click any player to view their full season stats and charts.
@@ -314,7 +522,200 @@ export function IndividualScores() {
             ))}
           </div>
         )}
+
+        <div className="mt-5 border-t border-[#2a2a2a] pt-4">
+          <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-white">
+            Advanced stats table
+          </div>
+          <p className="note mb-3 text-xs leading-snug text-[#777777]">
+            Only rounds with detailed stats are included (GIR is not null).
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1400px] border-collapse text-xs">
+              <thead>
+                <tr>
+                  <HeaderCell
+                    label="Player"
+                    tip="Player name (click to open profile)"
+                    sorted={sortKey === 'player'}
+                    dir={sortDir}
+                    onSort={() => setSort('player')}
+                    align="left"
+                  />
+                  <HeaderCell
+                    label="Rounds"
+                    tip="Number of rounds that include detailed stats (GIR recorded)"
+                    sorted={sortKey === 'rounds'}
+                    dir={sortDir}
+                    onSort={() => setSort('rounds')}
+                  />
+                  <HeaderCell
+                    label="Avg GIR"
+                    tip="Average Greens in Regulation per round out of 9. Higher is better."
+                    sorted={sortKey === 'avgGir'}
+                    dir={sortDir}
+                    onSort={() => setSort('avgGir')}
+                  />
+                  <HeaderCell
+                    label="Avg FIR"
+                    tip="Average Fairways in Regulation per round out of 9. Higher is better."
+                    sorted={sortKey === 'avgFir'}
+                    dir={sortDir}
+                    onSort={() => setSort('avgFir')}
+                  />
+                  <HeaderCell
+                    label="Avg Putts"
+                    tip="Average total putts per round. Lower is better."
+                    sorted={sortKey === 'avgPutts'}
+                    dir={sortDir}
+                    onSort={() => setSort('avgPutts')}
+                  />
+                  <HeaderCell
+                    label="Avg Penalties"
+                    tip="Average penalty strokes per round (OB, hazards, lost balls). Lower is better."
+                    sorted={sortKey === 'avgPen'}
+                    dir={sortDir}
+                    onSort={() => setSort('avgPen')}
+                  />
+                  <HeaderCell
+                    label="Avg U&D"
+                    tip="Average up-and-downs per round after missing a green."
+                    sorted={sortKey === 'avgUd'}
+                    dir={sortDir}
+                    onSort={() => setSort('avgUd')}
+                  />
+                  <HeaderCell
+                    label="Scramble %"
+                    tip="Average scramble % across rounds with both GIR and U&D recorded. Higher is better."
+                    sorted={sortKey === 'scrPct'}
+                    dir={sortDir}
+                    onSort={() => setSort('scrPct')}
+                  />
+                  <HeaderCell
+                    label="Avg Eagles"
+                    tip="Average eagles per round (2 under par holes)."
+                    sorted={sortKey === 'avgEagles'}
+                    dir={sortDir}
+                    onSort={() => setSort('avgEagles')}
+                  />
+                  <HeaderCell
+                    label="Avg Birdies"
+                    tip="Average birdies per round (1 under par holes)."
+                    sorted={sortKey === 'avgBirdies'}
+                    dir={sortDir}
+                    onSort={() => setSort('avgBirdies')}
+                  />
+                  <HeaderCell
+                    label="Avg Pars"
+                    tip="Average pars per round."
+                    sorted={sortKey === 'avgPars'}
+                    dir={sortDir}
+                    onSort={() => setSort('avgPars')}
+                  />
+                  <HeaderCell
+                    label="Avg Bogeys"
+                    tip="Average bogeys per round (1 over par holes)."
+                    sorted={sortKey === 'avgBogeys'}
+                    dir={sortDir}
+                    onSort={() => setSort('avgBogeys')}
+                  />
+                  <HeaderCell
+                    label="Avg Doubles"
+                    tip="Average doubles per round (2 over par holes)."
+                    sorted={sortKey === 'avgDoubles'}
+                    dir={sortDir}
+                    onSort={() => setSort('avgDoubles')}
+                  />
+                  <HeaderCell
+                    label="Avg Other"
+                    tip="Average 'other' per round (3+ over par holes)."
+                    sorted={sortKey === 'avgOther'}
+                    dir={sortDir}
+                    onSort={() => setSort('avgOther')}
+                  />
+                </tr>
+              </thead>
+              <tbody>
+                {advancedRows.map((r) => (
+                  <tr
+                    key={r.id}
+                    className="even:bg-[#1f1f1f] hover:bg-[#2a2a2a]"
+                  >
+                    <td className="border-b border-[#252525] py-2 pl-3 text-left font-semibold text-[#dddddd]">
+                      <Link
+                        to={`/player/${encodeURIComponent(r.player)}`}
+                        className="hover:text-[#E8650A] hover:underline"
+                      >
+                        {r.player}
+                      </Link>
+                    </td>
+                    <td className="border-b border-[#252525] py-2 text-center text-[#dddddd]">
+                      {r.display.rounds}
+                    </td>
+                    <td className="border-b border-[#252525] py-2 text-center text-[#dddddd]">
+                      {r.display.avgGir}
+                    </td>
+                    <td className="border-b border-[#252525] py-2 text-center text-[#dddddd]">
+                      {r.display.avgFir}
+                    </td>
+                    <td className="border-b border-[#252525] py-2 text-center text-[#dddddd]">
+                      {r.display.avgPutts}
+                    </td>
+                    <td className="border-b border-[#252525] py-2 text-center text-[#dddddd]">
+                      {r.display.avgPen}
+                    </td>
+                    <td className="border-b border-[#252525] py-2 text-center text-[#dddddd]">
+                      {r.display.avgUd}
+                    </td>
+                    <td className="border-b border-[#252525] py-2 text-center text-[#dddddd]">
+                      {r.display.scrPct}
+                    </td>
+                    <td className="border-b border-[#252525] py-2 text-center text-[#dddddd]">
+                      {r.display.avgEagles}
+                    </td>
+                    <td className="border-b border-[#252525] py-2 text-center text-[#dddddd]">
+                      {r.display.avgBirdies}
+                    </td>
+                    <td className="border-b border-[#252525] py-2 text-center text-[#dddddd]">
+                      {r.display.avgPars}
+                    </td>
+                    <td className="border-b border-[#252525] py-2 text-center text-[#dddddd]">
+                      {r.display.avgBogeys}
+                    </td>
+                    <td className="border-b border-[#252525] py-2 text-center text-[#dddddd]">
+                      {r.display.avgDoubles}
+                    </td>
+                    <td className="border-b border-[#252525] py-2 text-center text-[#dddddd]">
+                      {r.display.avgOther}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
+  )
+}
+
+function HeaderCell({ label, tip, sorted, dir, onSort, align = 'center' }) {
+  return (
+    <th
+      className={[
+        'cursor-pointer select-none border-b-2 border-[#E8650A] bg-[#111111] py-2.5 text-[11px] font-bold whitespace-nowrap hover:text-[#E8650A]',
+        align === 'left' ? 'pl-3 text-left' : 'px-2 text-center',
+        sorted ? 'text-[#E8650A]' : 'text-white',
+      ].join(' ')}
+      onClick={(e) => {
+        e.stopPropagation()
+        onSort()
+      }}
+    >
+      <Tooltip label={label} tip={tip} />
+      <span className={`ml-0.5 text-[9px] ${sorted ? 'opacity-100' : 'opacity-50'}`}>
+        {sorted ? (dir === 1 ? '▲' : '▼') : '▲'}
+      </span>
+    </th>
   )
 }

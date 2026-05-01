@@ -50,7 +50,7 @@ export default function App() {
           <Route element={<ShellLayout />}>
             <Route index element={<Leaderboard />} />
             <Route path="team-scores" element={<TeamScores />} />
-            <Route path="individual" element={<IndividualScores />} />
+            <Route path="advanced" element={<IndividualScores />} />
             <Route path="player/:name" element={<PlayerProfile />} />
             <Route
               path="manage/roster"

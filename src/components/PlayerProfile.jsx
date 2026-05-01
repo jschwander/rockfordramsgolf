@@ -799,8 +799,8 @@ export function PlayerProfile() {
       </div>
 
       <p className="mt-4 text-center text-xs text-[#555555]">
-        <Link to="/individual" className="text-[#888888] hover:text-[#E8650A] hover:underline">
-          Browse roster
+        <Link to="/advanced" className="text-[#888888] hover:text-[#E8650A] hover:underline">
+          Browse advanced stats
         </Link>
       </p>
     </div>

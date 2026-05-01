@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom'
 const tabs = [
   { to: '/', label: 'Leaderboard', icon: '🏆', short: 'Leaderboard' },
   { to: '/team-scores', label: 'Team Scores', icon: '📋', short: 'Team' },
-  { to: '/individual', label: 'Individual Scores', icon: '👤', short: 'Individual' },
+  { to: '/advanced', label: 'Advanced Stats', icon: '👤', short: 'Advanced' },
 ]
 
 export function NavTabs() {
