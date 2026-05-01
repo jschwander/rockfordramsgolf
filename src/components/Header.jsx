@@ -95,6 +95,14 @@ export function Header({ seasonSubtitle, onOpenAddRound }) {
                   >
                     💾 Export / Import
                   </NavLink>
+                  <NavLink
+                    to="/compare"
+                    role="menuitem"
+                    className={linkClass}
+                    onClick={() => setManageOpen(false)}
+                  >
+                    ⚖ Compare Players
+                  </NavLink>
                   <button
                     type="button"
                     role="menuitem"

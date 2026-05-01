@@ -7,6 +7,7 @@ import { Leaderboard } from './components/Leaderboard'
 import { TeamScores } from './components/TeamScores'
 import { IndividualScores } from './components/IndividualScores'
 import { PlayerProfile } from './components/PlayerProfile'
+import { ComparePlayers } from './components/ComparePlayers'
 import { AddRoundModal } from './components/AddRoundModal'
 import { RequireAdmin } from './components/RequireAdmin'
 import { ManageRoster } from './pages/manage/ManageRoster'
@@ -52,6 +53,14 @@ export default function App() {
             <Route path="team-scores" element={<TeamScores />} />
             <Route path="advanced" element={<IndividualScores />} />
             <Route path="player/:name" element={<PlayerProfile />} />
+            <Route
+              path="compare"
+              element={
+                <RequireAdmin>
+                  <ComparePlayers />
+                </RequireAdmin>
+              }
+            />
             <Route
               path="manage/roster"
               element={
